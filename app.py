@@ -17,9 +17,10 @@ def load_data():
     incidents = pd.read_csv("data/incident_summary.csv")
     pue       = pd.read_csv("data/pue_metrics.csv")
     weather   = pd.read_csv("data/weather_performance_correlation.csv")
-    return health, incidents, pue, weather
+    anomaly   = pd.read_csv("data/server_anomaly_scores.csv")
+    return health, incidents, pue, weather, anomaly
 
-health, incidents, pue, weather = load_data()
+health, incidents, pue, weather, anomaly = load_data()
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 st.sidebar.image("https://img.icons8.com/fluency/96/server.png", width=60)
@@ -32,7 +33,8 @@ page = st.sidebar.radio(
      "🖥️ Server Health",
      "🚨 Incident Analysis",
      "⚡ PUE & Power",
-     "🌤️ Weather & Performance"]
+     "🌤️ Weather & Performance",
+     "🤖 Predictive Alerts"]
 )
 st.sidebar.markdown("---")
 st.sidebar.markdown("📍 Ashburn, VA")
@@ -59,17 +61,31 @@ if page == "🏠 Executive Summary":
     st.markdown("### Executive Summary — Ashburn, VA Operations")
     st.markdown("---")
 
-    # KPI row
+    # ── KPI Row 1: Operations ─────────────────────────────────────────────────
     c1, c2, c3, c4 = st.columns(4)
     total_servers  = len(health)
     critical       = len(health[health["health_status"] == "Critical"])
     open_incidents = int(incidents["open_incidents"].sum())
     avg_pue        = round(pue["pue_proxy"].mean(), 3)
 
-    kpi(c1, "Total Servers",       total_servers,           "#2196F3")
-    kpi(c2, "Critical Servers",    critical,                "#f44336")
-    kpi(c3, "Open Incidents",      open_incidents,          "#FF9800")
-    kpi(c4, "Avg PUE Proxy",       avg_pue,                 "#4CAF50")
+    kpi(c1, "Total Servers",    total_servers,  "#2196F3")
+    kpi(c2, "Critical Servers", critical,       "#f44336")
+    kpi(c3, "Open Incidents",   open_incidents, "#FF9800")
+    kpi(c4, "Avg PUE Proxy",    avg_pue,        "#4CAF50")
+
+    st.markdown("###")
+
+    # ── KPI Row 2: ML Anomaly Alerts ─────────────────────────────────────────
+    c5, c6, c7, c8 = st.columns(4)
+    high_risk    = len(anomaly[anomaly["risk_level"] == "High Risk"])
+    medium_risk  = len(anomaly[anomaly["risk_level"] == "Medium Risk"])
+    anomaly_rate = round(len(anomaly[anomaly["is_anomaly"] == "Anomaly"]) / len(anomaly) * 100, 1)
+    total_anomalies = len(anomaly[anomaly["is_anomaly"] == "Anomaly"])
+
+    kpi(c5, "ML: High Risk Servers",    high_risk,       "#f44336")
+    kpi(c6, "ML: Medium Risk Servers",  medium_risk,     "#FF9800")
+    kpi(c7, "ML: Total Anomalies",      total_anomalies, "#9C27B0")
+    kpi(c8, "ML: Anomaly Rate %",       anomaly_rate,    "#2196F3")
 
     st.markdown("---")
     col1, col2 = st.columns(2)
@@ -103,18 +119,42 @@ if page == "🏠 Executive Summary":
         )
         st.plotly_chart(fig, use_container_width=True)
 
+    col3, col4 = st.columns(2)
+
+    # Anomaly risk breakdown bar
+    with col3:
+        st.subheader("ML Anomaly Risk by Location")
+        df_risk_loc = anomaly[anomaly["is_anomaly"] == "Anomaly"] \
+            .groupby(["data_center_location", "risk_level"])["is_anomaly"] \
+            .count().reset_index()
+        df_risk_loc.columns = ["data_center_location", "risk_level", "count"]
+        fig = px.bar(
+            df_risk_loc,
+            x="data_center_location",
+            y="count",
+            color="risk_level",
+            color_discrete_map={
+                "High Risk":   "#f44336",
+                "Medium Risk": "#FF9800",
+                "Low Risk":    "#4CAF50"
+            },
+            barmode="stack"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
     # Incident summary bar
-    st.subheader("Incidents by Location & Severity")
-    fig = px.bar(
-        incidents, x="data_center_location",
-        y="total_incidents", color="severity",
-        color_discrete_map={
-            "Critical":"#f44336","High":"#FF9800",
-            "Medium":"#2196F3","Low":"#4CAF50"
-        },
-        barmode="stack"
-    )
-    st.plotly_chart(fig, use_container_width=True)
+    with col4:
+        st.subheader("Incidents by Location & Severity")
+        fig = px.bar(
+            incidents, x="data_center_location",
+            y="total_incidents", color="severity",
+            color_discrete_map={
+                "Critical":"#f44336","High":"#FF9800",
+                "Medium":"#2196F3","Low":"#4CAF50"
+            },
+            barmode="stack"
+        )
+        st.plotly_chart(fig, use_container_width=True)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PAGE 2 — Server Health
@@ -351,6 +391,96 @@ elif page == "🌤️ Weather & Performance":
 
     st.subheader("Weather & Performance Detail Table")
     st.dataframe(weather.reset_index(drop=True), use_container_width=True)
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PAGE 6 — Predictive Alerts (ML Anomaly Detection)
+# ═══════════════════════════════════════════════════════════════════════════════
+elif page == "🤖 Predictive Alerts":
+    st.title("🤖 Predictive Alerts — ML Anomaly Detection")
+    st.markdown("**Model: Isolation Forest | Features: CPU, RAM, Storage, Network, Power**")
+    st.markdown("---")
+
+    # KPI row
+    c1, c2, c3, c4 = st.columns(4)
+    high_risk   = len(anomaly[anomaly["risk_level"] == "High Risk"])
+    medium_risk = len(anomaly[anomaly["risk_level"] == "Medium Risk"])
+    low_risk    = len(anomaly[anomaly["risk_level"] == "Low Risk"])
+    anomaly_pct = round(len(anomaly[anomaly["is_anomaly"] == "Anomaly"]) / len(anomaly) * 100, 1)
+
+    kpi(c1, "High Risk Readings",   high_risk,   "#f44336")
+    kpi(c2, "Medium Risk Readings", medium_risk, "#FF9800")
+    kpi(c3, "Low Risk Readings",    low_risk,    "#4CAF50")
+    kpi(c4, "Anomaly Rate %",       anomaly_pct, "#2196F3")
+
+    st.markdown("---")
+    col1, col2 = st.columns(2)
+
+    # Risk level distribution
+    with col1:
+        st.subheader("Risk Level Distribution")
+        fig = px.pie(
+            anomaly, names="risk_level",
+            color="risk_level",
+            color_discrete_map={
+                "High Risk":   "#f44336",
+                "Medium Risk": "#FF9800",
+                "Low Risk":    "#4CAF50"
+            },
+            hole=0.4
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Anomaly flag by location
+    with col2:
+        st.subheader("Anomalies by Data Center Location")
+        df_loc = anomaly[anomaly["is_anomaly"] == "Anomaly"] \
+            .groupby("data_center_location")["is_anomaly"] \
+            .count().reset_index()
+        df_loc.columns = ["data_center_location", "anomaly_count"]
+        fig = px.bar(
+            df_loc, x="data_center_location",
+            y="anomaly_count",
+            color="data_center_location"
+        )
+        st.plotly_chart(fig, use_container_width=True)
+
+    # Anomaly score scatter
+    st.subheader("Anomaly Score vs CPU Utilization")
+    fig = px.scatter(
+        anomaly,
+        x="cpu_pct", y="anomaly_score",
+        color="risk_level",
+        color_discrete_map={
+            "High Risk":   "#f44336",
+            "Medium Risk": "#FF9800",
+            "Low Risk":    "#4CAF50"
+        },
+        hover_data=["server_id", "data_center_location", "server_type"],
+        size="power_watts"
+    )
+    fig.add_hline(y=0, line_dash="dash",
+                  line_color="white", annotation_text="Risk threshold")
+    st.plotly_chart(fig, use_container_width=True)
+
+    # High and medium risk servers table
+    st.subheader("⚠️ High & Medium Risk Servers — Action Required")
+    df_alerts = anomaly[anomaly["risk_level"].isin(["High Risk", "Medium Risk"])] \
+        [[
+            "server_id", "data_center_location", "server_type",
+            "cpu_pct", "ram_pct", "storage_pct",
+            "power_watts", "anomaly_score", "risk_level"
+        ]].sort_values("anomaly_score")
+    st.dataframe(
+        df_alerts.reset_index(drop=True),
+        use_container_width=True
+    )
+
+    st.markdown("---")
+    st.info(
+        "**Model Info:** Isolation Forest trained on 151 server readings across 5 features. "
+        "Contamination rate set at 10% based on historical incident frequency. "
+        "Scores below 0 indicate anomalous behavior requiring investigation."
+    )
 
 # ── Footer ────────────────────────────────────────────────────────────────────
 st.markdown("---")
