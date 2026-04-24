@@ -227,7 +227,7 @@ streamlit run app.py
 
 ## 👤 Author
 **Amanuel Birri**
-📧 amanuelkbirri@gmailc.om
+📧 amanuelkbirri@gmail.com
 💼 [LinkedIn] www.linkedin.com/in/amanuel-birri
 
 ---
