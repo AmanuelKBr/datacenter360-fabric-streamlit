@@ -187,6 +187,15 @@ pl_master_datacenter360 (Runs Daily at 6:00 AM ET)
 
 ---
 
+## 🗄️ Fabric Artifacts Archive
+
+The Microsoft Fabric trial workspace that powered this project (lakehouses, pipelines,
+notebooks, semantic model, and reports) does not support Git integration or offline `.pbix`
+export. To preserve the full implementation beyond the trial period, all source artifacts —
+notebook code, pipeline configurations, semantic model DAX, lakehouse schemas, and exported
+report PDFs — are archived in [`fabric_archive/`](fabric_archive/), with a step-by-step
+preservation guide in [`fabric_archive/README.md`](fabric_archive/README.md).
+
 ## 📁 Repository Structure
 
 ```
@@ -199,6 +208,8 @@ datacenter360-fabric-streamlit/
 │   ├── pue_metrics.csv
 │   ├── weather_performance_correlation.csv
 │   └── server_anomaly_scores.csv
+├── fabric_archive/                 # Preserved Fabric source artifacts (notebooks,
+│                                    # pipelines, semantic model, schemas, report exports)
 └── README.md
 ```
 
