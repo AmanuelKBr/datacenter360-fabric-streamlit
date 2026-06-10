@@ -1,43 +1,34 @@
 # Pipeline: pl_ingest_gsheets_bronze
 
-> Screenshot of the full pipeline canvas: `screenshots/pl_ingest_gsheets_bronze_canvas.png`
+Full ARM template definition exported from Fabric: [`pl_ingest_gsheets_bronze.json`](pl_ingest_gsheets_bronze.json)
 
-## Trigger
+- **Workspace ID:** `adbcfe0d-bf1c-4d80-b926-e339a4faca0e`
+- **Last published:** 2026-04-22T06:13:13Z
 
-- Type: <!-- Manual / Scheduled -->
-- Schedule: <!-- e.g. none — invoked by pl_master_datacenter360 -->
+## Purpose
+Ingests the three Google Sheets sources (DCIM simulation data) into the `lh_bronze` lakehouse via the Data Factory HTTP connector.
 
-## Activities
+## Activities (sequential, `Completed` dependency chain)
 
-| # | Activity Name | Type | Source | Destination | Notes |
-|---|----------------|------|--------|-------------|-------|
-| 1 | | Copy Data (HTTP connector) | Google Sheets export URL: `server_inventory` | `lh_bronze.server_inventory` | |
-| 2 | | Copy Data (HTTP connector) | Google Sheets export URL: `incident_log` | `lh_bronze.incident_log` | |
-| 3 | | Copy Data (HTTP connector) | Google Sheets export URL: `capacity_utilization` | `lh_bronze.capacity_utilization` | |
+| Order | Activity | Type | Source | Sink (lh_bronze, schema `dbo`) |
+|-------|----------|------|--------|----------------------------------|
+| 1 | `copy_server_inventory` | Copy | Google Sheets (HTTP GET, CSV export) | Table `server_inventory` |
+| 2 | `copy_incident_log` | Copy | Google Sheets (HTTP GET, CSV export) | Table `incident_log` |
+| 3 | `copy_capacity_utilization` | Copy | Google Sheets (HTTP GET, CSV export) | Table `capacity_utilization` |
 
-## Activity Details
+All three activities use:
+- **Source:** `DelimitedTextSource` / `HttpReadSettings` (GET), comma-delimited, `firstRowAsHeader: true`, quote char `"`, escape char `\`
+- **Sink:** `LakehouseTableSink`, `tableActionOption: "Append"`, `partitionOption: "None"`, `applyVOrder: false`
+- **Translator:** `TabularTranslator` with explicit column mappings, `typeConversion: true`, `allowDataTruncation: true`
 
-### Activity 1 — server_inventory
+## Column Mappings (source → sink, all string→string with type conversion)
 
-- Source dataset / linked service: <!-- screenshot ref -->
-- Source settings (HTTP connector base URL, relative URL, format): <!-- fill in -->
-- Sink settings (table name, write behavior — overwrite/append): <!-- fill in -->
-- Mapping: <!-- fill in if custom mapping used -->
+**server_inventory**: server_id, rack_id, data_center_location, server_type, cpu_cores, ram_gb, install_date, status
 
-### Activity 2 — incident_log
+**incident_log**: incident_id, server_id, incident_date, incident_type, severity, resolution_time_hrs, resolved
 
-- Source settings: <!-- fill in -->
-- Sink settings: <!-- fill in -->
+**capacity_utilization**: record_id, server_id, timestamp, cpu_pct, ram_pct, storage_pct, network_mbps, power_watts
 
-### Activity 3 — capacity_utilization
-
-- Source settings: <!-- fill in -->
-- Sink settings: <!-- fill in -->
-
-## Dynamic Content / Expressions
-
-<!-- Paste any pipeline expressions (fx) used, e.g. for parameterized URLs or table names -->
-
-```
-<expression text here>
-```
+## Notes
+- This pipeline is also embedded (with identical activity definitions) inside `pl_master_datacenter360` rather than being invoked via `ExecutePipeline`.
+- The pipeline canvas/diagram metadata (`manifest.json`, including the linked-service connection names pointing at the Google Sheets export URLs and `lh_bronze`) was provided during export but omitted here as low-value (purely visual layout data) — the JSON above contains all functional configuration.
